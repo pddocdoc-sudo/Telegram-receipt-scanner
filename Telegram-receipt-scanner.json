@@ -1,0 +1,438 @@
+{
+  "name": "My workflow 7",
+  "nodes": [
+    {
+      "parameters": {
+        "updates": [
+          "message"
+        ],
+        "additionalFields": {
+          "download": true
+        }
+      },
+      "type": "n8n-nodes-base.telegramTrigger",
+      "typeVersion": 1.5,
+      "position": [
+        -480,
+        16
+      ],
+      "id": "1d1fed26-2766-441c-b142-e823f379a280",
+      "name": "Telegram Trigger",
+      "webhookId": "db0534db-10e2-4b1f-ab34-70c0ddd2d062",
+      "credentials": {
+        "telegramApi": {
+          "id": "sCDn4c8Q90MuvgCL",
+          "name": "Telegram account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "=Role: Expert AI Bookkeeper & Receipt OCR Parser.\nTask: Carefully inspect the attached receipt image and extract all transaction details into a clean, valid JSON object.\n\nExtraction Rules:\n1. merchant: Extract the official store/brand name from the top logo or header (e.g., \"The Home Depot\"). Ignore store numbers or taglines.\n2. date: Extract the receipt transaction date and convert it to YYYY-MM-DD format (e.g., 03/18/2026 -> 2026-03-18).\n3. currency: Extract the 3-letter currency code based on the symbol ($ = USD, ₱ = PHP, € = EUR).\n4. items: Extract every purchased product. \n   - Ignore 12-digit SKU/UPC barcode numbers printed below or next to item names.\n   - If a quantity is listed (e.g., \"2 x ITEM\"), set \"qty\" to 2 and \"unit_price\" to the single item price. Otherwise, default \"qty\" to 1.\n   - \"line_total\" must be the final price paid for that line item.\n5. subtotal, tax, total: Extract as pure numbers (floats) without currency symbols.\n6. payment_method: Extract the payment type (e.g., Mastercard, Visa, Cash, GCash).\n7. category: Classify the entire receipt into ONE exact category:\n   - Hardware & Supplies (tools, lumber, building materials, glue)\n   - Food & Dining (restaurants, cafes, groceries)\n   - Transportation (fuel, parking, transit)\n   - Office & Electronics (computers, stationery, software)\n   - Utilities & Bills (internet, electricity, phone)\n   - Other\n8. notes: Summarize the purchased items in 3–6 words (e.g., \"Lumber studs, DeWalt drill, glue\").\n9. status: Set to \"verified\" if total and merchant are readable, otherwise \"review_needed\".\n\nOutput ONLY valid JSON matching this exact structure (no markdown, no explanations):\n{\n  \"merchant\": \"\",\n  \"date\": \"\",\n  \"currency\": \"\",\n  \"subtotal\": 0.00,\n  \"tax\": 0.00,\n  \"total\": 0.00,\n  \"payment_method\": \"\",\n  \"category\": \"\",\n  \"items\": [\n    {\n      \"name\": \"\",\n      \"qty\": 1,\n      \"unit_price\": 0.00,\n      \"line_total\": 0.00\n    }\n  ],\n  \"notes\": \"\",\n  \"status\": \"\"\n}",
+        "options": {
+          "passthroughBinaryImages": true,
+          "passthroughBinaryPdfs": true
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 3.1,
+      "position": [
+        176,
+        0
+      ],
+      "id": "488fa9ad-9fae-4884-8b9e-44544da43f68",
+      "name": "AI Agent"
+    },
+    {
+      "parameters": {
+        "model": {
+          "__rl": true,
+          "value": "gpt-4.1-mini",
+          "mode": "list",
+          "cachedResultName": "gpt-4.1-mini"
+        },
+        "builtInTools": {},
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatOpenAi",
+      "typeVersion": 1.3,
+      "position": [
+        128,
+        224
+      ],
+      "id": "86963a1f-f636-4128-a133-f153f504fa4d",
+      "name": "OpenAI Chat Model",
+      "credentials": {
+        "openAiApi": {
+          "id": "z2nnLkugFzU48x8O",
+          "name": "OpenAI account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const rawOutput = $input.first().json.output;\n// Remove markdown formatting if present and parse JSON\nconst cleaned = rawOutput.replace(/```json|```/g, '').trim();\nconst parsed = JSON.parse(cleaned);\n\n// Return as an array of objects for Google Sheets\nreturn Array.isArray(parsed) ? parsed.map(item => ({ json: item })) : [{ json: parsed }];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        544,
+        0
+      ],
+      "id": "999a45d6-e6bf-44c5-a1a1-9effd76445b5",
+      "name": "Code in JavaScript"
+    },
+    {
+      "parameters": {
+        "operation": "append",
+        "documentId": {
+          "__rl": true,
+          "value": "1oRiAiCQqeSjzQzp8UVFKXU7_UmGeYnPpmqGrSkMJz1I",
+          "mode": "list",
+          "cachedResultName": "n8n-tracker",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1oRiAiCQqeSjzQzp8UVFKXU7_UmGeYnPpmqGrSkMJz1I/edit?usp=drivesdk"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "gid=0",
+          "mode": "list",
+          "cachedResultName": "Sheet1",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1oRiAiCQqeSjzQzp8UVFKXU7_UmGeYnPpmqGrSkMJz1I/edit#gid=0"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "File Name": "={{ $('Upload file').item.json.name }}",
+            "Date": "={{ $json.date }}",
+            "Merchant": "={{ $json.merchant }}",
+            "Category": "={{ $json.category }}",
+            "Items": "={{ $json.notes }}",
+            "Currency": "={{ $json.currency }}",
+            "Subtotal": "={{ $json.subtotal }}",
+            "Tax": "={{ $json.tax }}",
+            "Total": "={{ $json.total }}",
+            "Receipt Recorded": "={{ $now }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "Receipt Recorded",
+              "displayName": "Receipt Recorded",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "File Name",
+              "displayName": "File Name",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Date",
+              "displayName": "Date",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Merchant",
+              "displayName": "Merchant",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Category",
+              "displayName": "Category",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Items",
+              "displayName": "Items",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Currency",
+              "displayName": "Currency",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Subtotal",
+              "displayName": "Subtotal",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Tax",
+              "displayName": "Tax",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Total",
+              "displayName": "Total",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Payment",
+              "displayName": "Payment",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Method",
+              "displayName": "Method",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Notes",
+              "displayName": "Notes",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Status",
+              "displayName": "Status",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        768,
+        0
+      ],
+      "id": "72dfedec-6929-42b8-99c5-87f8c8b919a3",
+      "name": "Append row in sheet",
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "2UjiNdYT9lRQ2818",
+          "name": "Google Sheets account 2"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "driveId": {
+          "__rl": true,
+          "mode": "list",
+          "value": "My Drive"
+        },
+        "folderId": {
+          "__rl": true,
+          "value": "1td-nSScQFz25Bor9PDA9wZDMQNl_1DPM",
+          "mode": "list",
+          "cachedResultName": "n8n-receipt-folder",
+          "cachedResultUrl": "https://drive.google.com/drive/folders/1td-nSScQFz25Bor9PDA9wZDMQNl_1DPM"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleDrive",
+      "typeVersion": 3,
+      "position": [
+        -256,
+        -176
+      ],
+      "id": "46e30ba2-0ae4-4545-9b2f-e0aa6dc60e75",
+      "name": "Upload file",
+      "credentials": {
+        "googleDriveOAuth2Api": {
+          "id": "ZJRIp4FsrLQG8FqT",
+          "name": "Google Drive account 3"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "mode": "combine",
+        "combineBy": "combineByPosition",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3.2,
+      "position": [
+        0,
+        0
+      ],
+      "id": "485c1830-62cf-478a-a732-5adcb8cd0181",
+      "name": "Merge"
+    },
+    {
+      "parameters": {
+        "chatId": "={{ $('Telegram Trigger').item.json.message.chat.id }}",
+        "text": "=Hi  {{ $('Telegram Trigger').item.json.message.from.first_name }},\n\nThis is received:\n\nFile Name:",
+        "additionalFields": {}
+      },
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        992,
+        0
+      ],
+      "id": "d443686e-8d06-4030-8011-3e6356966c32",
+      "name": "Send a text message",
+      "webhookId": "1213bae9-5051-47a0-9cbf-b5a7457f4857",
+      "credentials": {
+        "telegramApi": {
+          "id": "sCDn4c8Q90MuvgCL",
+          "name": "Telegram account"
+        }
+      }
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Telegram Trigger": {
+      "main": [
+        [
+          {
+            "node": "Upload file",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Merge",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "OpenAI Chat Model": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "AI Agent": {
+      "main": [
+        [
+          {
+            "node": "Code in JavaScript",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code in JavaScript": {
+      "main": [
+        [
+          {
+            "node": "Append row in sheet",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Append row in sheet": {
+      "main": [
+        [
+          {
+            "node": "Send a text message",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Upload file": {
+      "main": [
+        [
+          {
+            "node": "Merge",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Merge": {
+      "main": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send a text message": {
+      "main": [
+        []
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate"
+  },
+  "versionId": "4311c521-ec0a-447f-a712-01f1c4c5957b",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "45aa2f4d6fa5dbc85ee9e1ae8bad8a0648abc7cba98977609b6bae5dcb792e4e"
+  },
+  "nodeGroups": [],
+  "id": "9wf8Dv2WA7DRAEFT",
+  "tags": []
+}
