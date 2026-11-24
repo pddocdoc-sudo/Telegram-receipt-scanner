@@ -1,0 +1,161 @@
+{
+  "name": "Google Sheets to QuickBooks Bill (Sandbox)",
+  "nodes": [
+    {
+      "parameters": {
+        "pollTimes": {
+          "item": [
+            {
+              "mode": "everyMinute"
+            }
+          ]
+        },
+        "documentId": {
+          "__rl": true,
+          "value": "",
+          "mode": "list"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "",
+          "mode": "list"
+        },
+        "event": "rowAdded",
+        "options": {}
+      },
+      "name": "Google Sheets Trigger",
+      "type": "n8n-nodes-base.googleSheetsTrigger",
+      "typeVersion": 1,
+      "position": [
+        0,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "https://sandbox-quickbooks.api.intuit.com/v3/company/9341458657796462/query",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "quickBooksOAuth2Api",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "query",
+              "value": "=select * from Vendor where DisplayName = '{{ $json.Vendor.replace(/'/g, \"\\\\'\") }}'"
+            },
+            {
+              "name": "minorversion",
+              "value": "75"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "name": "Get Vendor",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        300,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "https://sandbox-quickbooks.api.intuit.com/v3/company/9341458657796462/query",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "quickBooksOAuth2Api",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "query",
+              "value": "=select * from Account where FullyQualifiedName = '{{ $('Google Sheets Trigger').item.json.CATEGORY }}'"
+            },
+            {
+              "name": "minorversion",
+              "value": "75"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "name": "Get Account",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        600,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://sandbox-quickbooks.api.intuit.com/v3/company/9341458657796462/bill",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "quickBooksOAuth2Api",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "minorversion",
+              "value": "75"
+            }
+          ]
+        },
+        "options": {},
+        "sendBody": true,
+        "contentType": "json",
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"DocNumber\": \"{{ $('Google Sheets Trigger').item.json['Bill no.'] }}\",\n  \"VendorRef\": { \"value\": \"{{ $('Get Vendor').item.json.QueryResponse.Vendor[0].Id }}\" },\n  \"TxnDate\": \"{{ DateTime.fromFormat($('Google Sheets Trigger').item.json['Bill date'], 'MM/dd/yyyy').toFormat('yyyy-MM-dd') }}\",\n  \"DueDate\": \"{{ DateTime.fromFormat($('Google Sheets Trigger').item.json['Due Date'], 'MM/dd/yyyy').toFormat('yyyy-MM-dd') }}\",\n  \"Line\": [\n    {\n      \"DetailType\": \"AccountBasedExpenseLineDetail\",\n      \"Amount\": {{ Number($('Google Sheets Trigger').item.json['Bill amount']) }},\n      \"Description\": \"{{ $('Google Sheets Trigger').item.json.CATEGORY }}\",\n      \"AccountBasedExpenseLineDetail\": {\n        \"AccountRef\": { \"value\": \"{{ $('Get Account').item.json.QueryResponse.Account[0].Id }}\" }\n      }\n    },\n    {\n      \"DetailType\": \"AccountBasedExpenseLineDetail\",\n      \"Amount\": {{ Number($('Google Sheets Trigger').item.json['TAX'] || 0) }},\n      \"Description\": \"Tax\",\n      \"AccountBasedExpenseLineDetail\": {\n        \"AccountRef\": { \"value\": \"{{ $('Get Account').item.json.QueryResponse.Account[0].Id }}\" }\n      }\n    }\n  ]\n}"
+      },
+      "name": "Create Bill",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        900,
+        0
+      ]
+    }
+  ],
+  "connections": {
+    "Google Sheets Trigger": {
+      "main": [
+        [
+          {
+            "node": "Get Vendor",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Vendor": {
+      "main": [
+        [
+          {
+            "node": "Get Account",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Account": {
+      "main": [
+        [
+          {
+            "node": "Create Bill",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "pinData": {},
+  "settings": {
+    "executionOrder": "v1"
+  }
+}
