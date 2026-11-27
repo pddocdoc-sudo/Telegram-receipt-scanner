@@ -1,0 +1,200 @@
+{
+  "name": "Google Sheets to QuickBooks Bill (Sandbox)",
+  "nodes": [
+    {
+      "parameters": {
+        "pollTimes": {
+          "item": [
+            {
+              "mode": "everyMinute"
+            }
+          ]
+        },
+        "documentId": {
+          "__rl": true,
+          "value": "1FLVdKdqwjsu4SajAZMCdR22DUc3qXHrRrWyi0XZbT2Q",
+          "mode": "list",
+          "cachedResultName": "AP invoice",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1FLVdKdqwjsu4SajAZMCdR22DUc3qXHrRrWyi0XZbT2Q/edit?usp=drivesdk"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "gid=0",
+          "mode": "list",
+          "cachedResultName": "Brosnahan Insurance Agency",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1FLVdKdqwjsu4SajAZMCdR22DUc3qXHrRrWyi0XZbT2Q/edit#gid=0"
+        },
+        "event": "rowAdded",
+        "options": {}
+      },
+      "name": "Google Sheets Trigger",
+      "type": "n8n-nodes-base.googleSheetsTrigger",
+      "typeVersion": 1,
+      "position": [
+        -960,
+        -608
+      ],
+      "id": "ae036ada-464b-4296-b7ef-7a6b074f868f",
+      "credentials": {
+        "googleSheetsTriggerOAuth2Api": {
+          "id": "vBqGXkxqQBlsKXdN",
+          "name": "Google Sheets Trigger account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "url": "https://sandbox-quickbooks.api.intuit.com/v3/company/9341458657796462/query",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "quickBooksOAuth2Api",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "query",
+              "value": "=select * from Vendor where DisplayName = '{{ $json.Vendor.replace(/'/g, \"\\\\'\") }}'"
+            },
+            {
+              "name": "minorversion",
+              "value": "75"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "name": "Get Vendor",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        -656,
+        -608
+      ],
+      "id": "00f9ad60-14e3-43cd-9928-aaf9c86f6ec5",
+      "credentials": {
+        "quickBooksOAuth2Api": {
+          "id": "JWBEZTnxKMyX36nh",
+          "name": "QuickBooks Online account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "url": "https://sandbox-quickbooks.api.intuit.com/v3/company/9341458657796462/query",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "quickBooksOAuth2Api",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "query",
+              "value": "=select * from Account where FullyQualifiedName = '{{ $('Google Sheets Trigger').item.json.CATEGORY }}'"
+            },
+            {
+              "name": "minorversion",
+              "value": "75"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "name": "Get Account",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        -352,
+        -608
+      ],
+      "id": "dcb8ab4f-d00a-4046-842a-511b1883e6be",
+      "credentials": {
+        "quickBooksOAuth2Api": {
+          "id": "JWBEZTnxKMyX36nh",
+          "name": "QuickBooks Online account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://sandbox-quickbooks.api.intuit.com/v3/company/9341458657796462/bill",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "quickBooksOAuth2Api",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "minorversion",
+              "value": "75"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"DocNumber\": \"{{ $('Google Sheets Trigger').item.json['Bill no.'] }}\",\n  \"VendorRef\": { \"value\": \"{{ $('Get Vendor').item.json.QueryResponse.Vendor[0].Id }}\" },\n  \"TxnDate\": \"{{ DateTime.fromFormat($('Google Sheets Trigger').item.json['Bill date'], 'M/d/yyyy').toFormat('yyyy-MM-dd') }}\",\n  \"DueDate\": \"{{ DateTime.fromFormat($('Google Sheets Trigger').item.json['Due Date'], 'M/d/yyyy').toFormat('yyyy-MM-dd') }}\",\n  \"Line\": [\n    {\n      \"DetailType\": \"AccountBasedExpenseLineDetail\",\n      \"Amount\": {{ Number($('Google Sheets Trigger').item.json['Bill amount']) }},\n      \"Description\": \"{{ $('Google Sheets Trigger').item.json.CATEGORY }}\",\n      \"AccountBasedExpenseLineDetail\": {\n        \"AccountRef\": { \"value\": \"{{ $('Get Account').item.json.QueryResponse.Account[0].Id }}\" }\n      }\n    },\n    {\n      \"DetailType\": \"AccountBasedExpenseLineDetail\",\n      \"Amount\": {{ Number($('Google Sheets Trigger').item.json['TAX'] || 0) }},\n      \"Description\": \"Tax\",\n      \"AccountBasedExpenseLineDetail\": {\n        \"AccountRef\": { \"value\": \"{{ $('Get Account').item.json.QueryResponse.Account[0].Id }}\" }\n      }\n    }\n  ]\n}",
+        "options": {}
+      },
+      "name": "Create Bill",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        -64,
+        -608
+      ],
+      "id": "c177d258-305c-4343-b10a-ea34a5f7ec08",
+      "credentials": {
+        "quickBooksOAuth2Api": {
+          "id": "JWBEZTnxKMyX36nh",
+          "name": "QuickBooks Online account"
+        }
+      }
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Google Sheets Trigger": {
+      "main": [
+        [
+          {
+            "node": "Get Vendor",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Vendor": {
+      "main": [
+        [
+          {
+            "node": "Get Account",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Account": {
+      "main": [
+        [
+          {
+            "node": "Create Bill",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate"
+  },
+  "versionId": "0e51c879-0f2c-42e8-97e6-abf887bd33c2",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "ec4a8a80d63717ab1b279a24caf3effabdbaa72285e571f4a90d7a497bbf3955"
+  },
+  "nodeGroups": [],
+  "id": "u2gcJEjNzvqcduGy",
+  "tags": []
+}
